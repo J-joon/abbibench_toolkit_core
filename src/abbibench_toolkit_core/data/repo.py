@@ -13,9 +13,6 @@ import pandas as pd
 # Dataset ID normalization (CSV-facing)
 # ---------------------------------------------------------------------
 #
-# The AbBiBench repo may store some datasets under *_LC filenames (e.g., 1mhp_LC),
-# while users/tooling may refer to them without the suffix (e.g., 1mhp).
-#
 # This mapping is the single source of truth for:
 #   - GT CSV lookup under data/binding_affinity/
 #   - output file naming under outputs/
@@ -35,8 +32,10 @@ DATASET_CSV_ALIASES: dict[str, str] = {
     "aayl50": "aayl50_LC",
     "aayl50_lc": "aayl50_LC",
 
-    "aayl51": "aayl51_LC",
-    "aayl51_lc": "aayl51_LC",
+    # IMPORTANT: on disk, aayl51 is NOT suffixed with _LC
+    #   data/binding_affinity/aayl51_benchmarking_data.csv
+    "aayl51": "aayl51",
+    "aayl51_lc": "aayl51",
 
     "aayl52": "aayl52_LC",
     "aayl52_lc": "aayl52_LC",
@@ -55,6 +54,7 @@ def normalize_csv_dataset_id(dataset_id: str) -> str:
       - "aayl50"    -> "aayl50_LC"
       - "aayl52"    -> "aayl52_LC"
       - "1mhp"      -> "1mhp_LC"
+      - "aayl51_lc" -> "aayl51"
       - "3gbn_h1"   -> "3gbn_h1"   (no change)
 
     Notes:
@@ -188,8 +188,6 @@ class AbBiBenchRepo:
         """
         Canonical output path:
           <root>/outputs/{dataset}_benchmarking_data_{model}_scores.csv
-
-        Note: dataset_id is normalized (LC/case) before constructing filename.
         """
         ds = normalize_csv_dataset_id(dataset_id)
         return (self.root_dir / "outputs" / f"{ds}_benchmarking_data_{model_id}_scores.csv").resolve()
