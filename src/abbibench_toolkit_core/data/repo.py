@@ -12,16 +12,32 @@ import pandas as pd
 # ---------------------------------------------------------------------
 # Dataset ID normalization (CSV-facing)
 # ---------------------------------------------------------------------
-
-# User-facing inputs -> canonical CSV dataset id (prefix before "_benchmarking_data.csv")
-# Add mappings here when you discover new aliases in scripts/configs.
+#
+# The AbBiBench repo may store some datasets under *_LC filenames (e.g., 1mhp_LC),
+# while users/tooling may refer to them without the suffix (e.g., 1mhp).
+#
+# This mapping is the single source of truth for:
+#   - GT CSV lookup under data/binding_affinity/
+#   - output file naming under outputs/
+#
+# IMPORTANT:
+# normalize_csv_dataset_id() lowercases the input for lookup, so keys here MUST be lowercase.
+# Values are canonical on-disk dataset ids (case/suffix preserved).
+#
 DATASET_CSV_ALIASES: dict[str, str] = {
     # case / naming variants
     "aayl49_ml": "aayl49_ML",
-    "aayl49_ML": "aayl49_ML",
+
     # leaderboard sometimes refers to LC sets without suffix
+    "1mhp": "1mhp_LC",
+    "1mhp_lc": "1mhp_LC",
+
     "aayl50": "aayl50_LC",
     "aayl50_lc": "aayl50_LC",
+
+    "aayl51": "aayl51_LC",
+    "aayl51_lc": "aayl51_LC",
+
     "aayl52": "aayl52_LC",
     "aayl52_lc": "aayl52_LC",
 }
@@ -37,7 +53,13 @@ def normalize_csv_dataset_id(dataset_id: str) -> str:
     Examples:
       - "aayl49_ml" -> "aayl49_ML"
       - "aayl50"    -> "aayl50_LC"
+      - "aayl52"    -> "aayl52_LC"
+      - "1mhp"      -> "1mhp_LC"
       - "3gbn_h1"   -> "3gbn_h1"   (no change)
+
+    Notes:
+      - Lookup is case-insensitive (we lower() the key).
+      - Values returned are canonical on-disk dataset ids.
     """
     ds = dataset_id.strip()
     if not ds:
@@ -50,6 +72,8 @@ def base_id_from_dataset_id(dataset_id: str) -> str:
     """
     Convert a CSV dataset id (e.g., "3gbn_h1") into its base id (e.g., "3gbn")
     for metadata/PDB lookup.
+
+    We normalize CSV id first, then take the part before the first underscore.
     """
     ds = normalize_csv_dataset_id(dataset_id)
     return ds.split("_", 1)[0]
@@ -164,6 +188,8 @@ class AbBiBenchRepo:
         """
         Canonical output path:
           <root>/outputs/{dataset}_benchmarking_data_{model}_scores.csv
+
+        Note: dataset_id is normalized (LC/case) before constructing filename.
         """
         ds = normalize_csv_dataset_id(dataset_id)
         return (self.root_dir / "outputs" / f"{ds}_benchmarking_data_{model_id}_scores.csv").resolve()
@@ -187,6 +213,7 @@ class AbBiBenchRepo:
     def available_gt_datasets(self) -> list[str]:
         """
         Enumerate dataset ids available under data/binding_affinity/*_benchmarking_data.csv.
+        Returns the on-disk dataset ids (prefix before BENCHMARKING_SUFFIX).
         """
         if not self.binding_dir.exists():
             return []
@@ -295,8 +322,9 @@ class DatasetView:
     """
     Lightweight view for one CSV dataset id (e.g., "3gbn_h1", "2fjg", "aayl49_ML").
 
-    - `csv_dataset_id`: used for GT CSV lookup
-    - `base_id`: used for metadata/PDB lookup
+    - `csv_dataset_id`: user-facing dataset id
+    - normalization happens via normalize_csv_dataset_id()
+    - base_id is used for metadata/PDB lookup
     """
     repo: AbBiBenchRepo
     csv_dataset_id: str
